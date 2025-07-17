@@ -10,7 +10,7 @@ An open-source application for building, observing, and collaborating with teams
 
 Common Ground allows you to construct sophisticated multi-agent systems that can tackle complex research and analysis tasks. It combines a powerful **Partner-Principal-Associate** agent architecture with a rich, real-time web interface, turning complex AI processes into transparent, manageable, and collaborative workflows.
 
-![Common Ground Demo GIF](https://your-repository/path/to/demo.gif)
+![Common Ground Demo GIF](assets/demo.gif)
 > **Note**: Please replace the GIF path above with a real screen recording of your UI in action. This is the single most effective way to showcase your project!
 
 ## ✨ Key Features
