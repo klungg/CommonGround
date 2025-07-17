@@ -30,7 +30,7 @@ services:
     build:
       context: ./gemini-cli-mcp-openai-bridge
       dockerfile: Dockerfile
-    image: ghcr.io/intelligent-internet/gemini-cli-mcp-openai-bridge:latest
+    image: intelligentinternet/gemini-cli-mcp-openai-bridge
     working_dir: /app/gemini-cli/packages/bridge-server
     command: ["npm", "run", "start", "--", "--host", "0.0.0.0", "--resolve-redirects"]
     depends_on:
@@ -69,7 +69,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: ghcr.io/intelligent-internet/common_ground_core:latest
+    image: intelligentinternet/common_ground_core
     depends_on:
       bridge:
         condition: service_healthy
