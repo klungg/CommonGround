@@ -63,8 +63,8 @@ jobs:
       - name: Build and push bridge image
         uses: docker/build-push-action@v6
         with:
-          context: ./gemini-cli-mcp-openai-bridge
-          file: ./gemini-cli-mcp-openai-bridge/Dockerfile
+          context: ./deployment/gemini-cli-mcp-openai-bridge
+          file: ./deployment/gemini-cli-mcp-openai-bridge/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta_bridge.outputs.tags }}
