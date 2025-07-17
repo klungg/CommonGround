@@ -20,7 +20,7 @@ Common Ground allows you to construct sophisticated multi-agent systems that can
 
 *   **🔭 Full Observability Suite**: Go beyond `print()` debugging. Visualize your agent team's execution in real-time with dynamic **Flow**, **Kanban**, and **Timeline** views. Understand every decision, tool call, and state change.
 
-*   **🛠️ Extensible & Unified Tooling**: Easily integrate custom Python tools or external APIs via the Meta-Controller Protocol (MCP). All capabilities are treated as standardized tools that any agent can use.
+*   **🛠️ Extensible & Unified Tooling**: Easily integrate custom Python tools or external APIs via the Model Context Protocol (MCP). All capabilities are treated as standardized tools that any agent can use.
 
 *   **🔌 Model Agnostic with Gemini Out-of-the-Box**: Powered by `LiteLLM`, the framework supports any major LLM provider. The default Docker setup includes a pre-configured bridge for seamless Google Gemini integration.
 
