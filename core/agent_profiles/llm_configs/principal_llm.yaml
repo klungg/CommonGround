@@ -1,0 +1,22 @@
+name: principal_llm # Logical name, referenced by Agent Profile's llm_config_ref
+base_llm_config: base_default_llm # Inherits base configuration
+type: llm_config
+description_for_human: "LLM config for high-level strategic tasks (Principal/Partner)."
+
+config:
+  model: "openai/gemini-2.5-pro"
+  base_url:
+    _type: "from_env"
+    var: "GEMINI_BRIDGE_URL"
+    default: "http://127.0.0.1:8765/v1"
+    required: false
+  api_key: "5678"
+    # _type: "from_env"
+    # var: "PRINCIPAL_LLM"
+    # required: false
+    # default: "gemini/gemini-2.5-pro-preview"
+  temperature:
+    _type: "from_env"
+    var: "PRINCIPAL_TEMPERATURE"
+    required: false
+    default: 1.0

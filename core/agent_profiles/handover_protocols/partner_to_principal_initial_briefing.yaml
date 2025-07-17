@@ -1,0 +1,64 @@
+
+protocol_name: partner_to_principal_initial_briefing
+version: 2.1 # Version bump
+description: "Defines the context handover from Partner to Principal for a new execution."
+
+# The context_parameters section remains unchanged
+context_parameters:
+  type: object
+  properties:
+    initial_briefing_for_principal:
+      type: object
+      x-handover-title: "Project Briefing & Initial Plan"
+      description: "The initial project briefing for the Principal Agent."
+      properties:
+        user_query:
+          type: string
+          x-handover-title: "User's Original Query"
+          description: "The original research question or goal from the user."
+        notes_from_partner:
+          type: string
+          x-handover-title: "Partner's Analysis & Notes"
+          description: "Partner's detailed breakdown, hypotheses, and initial plan."
+        communication_language:
+          type: string
+          x-handover-title: "Language for Communication"
+          description: "The language that User was using in the query to communicate with Partner."
+      required: ["user_query", "notes_from_partner"]
+    
+    confirmed_associate_profiles_details_list:
+      type: array
+      description: "A list containing the logical names of user-confirmed Associate Profiles (e.g., 'Associate_WebSearcher_EN'), from which the Principal will select and dispatch tasks. Required in 'start_fresh' mode, optional in 'continue_from_previous' mode (if the team needs to be updated). The tool will resolve the latest active instance IDs from the agent_profiles_store based on these names."
+      items: 
+        type: "string"
+        description: "The logical name of the Associate Profile (e.g., 'Associate_WebSearcher_EN')."
+
+    new_directives_for_iteration:
+      type: object
+      description: "In 'continue_from_previous' mode, contains instructions, context, or plan adjustments to guide the new iteration."
+      properties:
+        user_query_adjustment:
+          type: "string"
+          description: "Adjustments or new focus for the original user query."
+        additional_notes:
+          type: "string"
+          description: "Additional context or guidance provided by the Partner for the new iteration."
+
+  required: ["initial_briefing_for_principal"]
+
+target_inbox_item:
+  source: AGENT_STARTUP_BRIEFING
+
+# inheritance is now a flexible list
+context_inheritance:
+  - from_source:
+      path: "team.work_modules"
+    as_payload_key: "current_work_modules"
+    x-handover-title: "Current Project Plan (Work Modules)"
+    condition: "v['team.work_modules']" # Inherit only if work modules exist
+
+  - from_source:
+      path: "state.messages"
+    as_payload_key: "inherited_partner_messages"
+    x-handover-title: "Full Conversation History with Partner"
+    condition: "len(v['state.messages']) > 1" # Inherit only if there is a substantial conversation

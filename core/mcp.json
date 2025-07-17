@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "G": {
+      "transport": "http",
+      "url": "http://localhost:8765/mcp",
+      "enabled": true
+    }
+  }
+}

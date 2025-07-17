@@ -1,0 +1,80 @@
+{
+  "modelProviders": {
+    "openrouter": {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "enabled": true,
+      "apiKey": "",
+      "description": "Receive emails about new products, features, and more.",
+      "url": "https://openrouter.ai"
+    },
+    "gemini": {
+      "id": "gemini",
+      "name": "Gemini",
+      "enabled": true,
+      "apiKey": "",
+      "description": "Receive emails about new products, features, and more.",
+      "url": "https://gemini.google.com"
+    },
+    "openai": {
+      "id": "openai",
+      "name": "OpenAI", 
+      "enabled": false,
+      "apiKey": "",
+      "description": "Receive emails about new products, features, and more.",
+      "url": "https://openai.com"
+    }
+  },
+  "generalSettings": {
+    "principalAssistant": {
+      "id": "principalAssistant",
+      "label": "Principal Assistant Model",
+      "description": "Anonymous reporting of errors and statistics",
+      "type": "select",
+      "value": "Gemini/Gemini 2.0 Flash",
+      "options": [
+        "Gemini/Gemini 2.0 Flash",
+        "OpenAI/GPT-4",
+        "OpenRouter/Claude-3.5"
+      ]
+    },
+    "partnerAssistant": {
+      "id": "partnerAssistant", 
+      "label": "Partner Assistant Model",
+      "description": "Anonymous reporting of errors and statistics",
+      "type": "select",
+      "value": "Gemini/Gemini 1.5 Flash",
+      "options": [
+        "Gemini/Gemini 1.5 Flash",
+        "OpenAI/GPT-3.5-turbo",
+        "OpenRouter/Claude-3"
+      ]
+    }
+  },
+  "aboutInfo": {
+    "appInfo": {
+      "name": "II-Commons",
+      "version": "1.0.0",
+      "buildDate": "2025.06.15",
+      "icon": "/webview/logo.png"
+    },
+    "links": [
+      {
+        "id": "twitter",
+        "label": "Follow us on Twitter",
+        "url": "https://twitter.com/ii-commons",
+        "icon": "twitter"
+      },
+      {
+        "id": "roadmap",
+        "label": "Product Roadmap",
+        "url": "https://roadmap.ii-commons.com",
+        "icon": "rocket"
+      }
+    ],
+    "community": {
+      "description": "Have an idea, feature request or found a bug? Let us know, and we'll take a look at it!",
+      "discordUrl": "https://discord.gg/ii-commons"
+    }
+  }
+} 

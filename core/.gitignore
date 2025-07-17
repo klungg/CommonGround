@@ -1,0 +1,103 @@
+# Node.js / Yarn / npm
+node_modules/
+.pnp/
+.pnp.js
+.npm
+.eslintcache
+.node_repl_history
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Build artifacts
+dist/
+build/
+out/
+
+# IDE-specific
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Log files
+logs/
+*.log
+
+# Temporary & Cache files
+*.tmp
+*.temp
+*.swp
+*.swo
+.cache/
+
+# Compiled binaries
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Compressed archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Project-specific generated files
+reports/
+debug/
+.specstory/
+faiss_memories/
+format.bat
+repomix-output.xml
+.aider*
+runs/
+projects/
+workspace/
+bug_commit.txt
+
+# Generated MCP tools cache file
+.current_mcp_tools.yaml
+
+# Allow specific dotfiles required for the project
+!/.dockerignore
+!/.gitmodules
+!/runs/.gitignore
+!/.github
+
+.claude

@@ -1,0 +1,3 @@
+[submodule "deployment/gemini-cli-mcp-openai-bridge"]
+	path = deployment/gemini-cli-mcp-openai-bridge
+	url = https://github.com/Intelligent-Internet/gemini-cli-mcp-openai-bridge.git

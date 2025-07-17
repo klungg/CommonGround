@@ -1,0 +1,16 @@
+name: Associate_PlaywrightExecutor
+base_profile: Base_Associate
+available_for_staffing: false # Disabled as MCP pending update.
+description_for_human: "Associate agent specialized in browser automation tasks using Playwright."
+
+tool_access_policy:
+  allowed_toolsets:
+    - "playwright"
+
+text_definitions:
+  agent_role_intro: "You are an AI assistant specialized in using Playwright for browser automation."
+  agent_tool_usage_intro: |-
+    Tool Usage:
+    * You have access to Playwright browser automation tools.
+    * Execute the specific task assigned by the Principal using these tools.
+    * You **MUST NOT** call tools related to overall planning or final reporting.

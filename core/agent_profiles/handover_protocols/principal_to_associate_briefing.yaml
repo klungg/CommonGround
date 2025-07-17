@@ -1,0 +1,55 @@
+protocol_name: principal_to_associate_briefing
+version: 2.1
+description: "Defines the context handover from Principal to an Associate Agent for a specific work module."
+
+# 1. context_parameters: Defines the parameters to be filled directly by the parent Agent's (Principal) LLM
+context_parameters:
+  type: object
+  properties:
+    shared_context_for_all_assignments:
+      type: string
+      x-handover-title: "Shared Project Context"
+      description: "(Required) Common project background and context information shared by all parallel tasks."
+    assignment_specific_instructions:
+      type: string
+      x-handover-title: "Specific Instructions from Principal"
+      description: "Additional context or detailed instructions for this specific assignment."
+    module_id_to_assign:
+      type: string
+      description: "The ID of the work module to assign. This will be used to look up the module details."
+    inherit_messages_from:
+      type: array
+      description: "A list of other module IDs whose message history should be inherited as context."
+      items: { "type": "string" }
+  required: ["module_id_to_assign", "assignment_specific_instructions", "shared_context_for_all_assignments"]
+
+# 2. inheritance: Defines the data that HandoverService needs to extract from the parent Agent's (Principal) context
+inheritance:
+  - from_source:
+      path: "team.work_modules.{{ module_id }}"
+      replace:
+        module_id: "state.current_action.parameters.module_id_to_assign"
+    as_payload_key: "module_details"
+    x-handover-title: "Assigned Work Module Details"
+    condition: "v['state.current_action.parameters.module_id_to_assign']"
+
+  - from_source:
+      path: "team.work_modules.{{ module_id }}.context_archive"
+      replace:
+        module_id: "state.current_action.parameters.module_id_to_assign"
+    as_payload_key: "full_context_archive_for_rework"
+    x-handover-title: "Complete Rework/Iteration History"
+    condition: "v['state.current_action.parameters.module_id_to_assign'] and len((v['team.work_modules.' + v['state.current_action.parameters.module_id_to_assign'] + '.context_archive'] or [])) > 0"
+
+  - from_source:
+      path_to_iterate: "team.work_modules.{{ module_id }}.context_archive[-1].messages"
+      iterate_on:
+        module_id: "state.current_action.parameters.inherit_messages_from"
+    as_payload_key: "inherited_messages"
+    x-handover-title: "Inherited Messages from Other Modules"
+    condition: "v['state.current_action.parameters.inherit_messages_from']"
+
+# 3. target_inbox_item: Defines the metadata of the finally generated InboxItem
+target_inbox_item:
+  source: AGENT_STARTUP_BRIEFING
+

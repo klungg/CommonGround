@@ -1,0 +1,85 @@
+# ================================================================
+# RAG Data Source Configuration: Internal Project Documents
+# ================================================================
+#
+# This configuration defines a RAG data source for storing and indexing internal project documents
+# (e.g., user-uploaded .md, .py, .txt files). It is designed to be writable for dynamically building the knowledge base.
+
+# Unique logical name for the data source. Must match an entry in index.yaml.
+source_name: "internal_project_docs"
+
+# Database file path.
+# This is a relative path, relative to the project root directory.
+# The RAG service will automatically create directories and files if they do not exist at startup.
+database_file: "internal_project_docs.duckdb"
+
+# Whether the database is writable.
+# true: Allows the rag_add tool to write data.
+# false: Rejects all write operations.
+database_writable: true
+is_global: false
+description: "Contains internal documents, notes, and user-uploaded files for this project. Used for answering questions about this specific project."
+
+# ----------------------------------------------------------------
+# Metadata Table Configuration
+# ----------------------------------------------------------------
+meta_table:
+  # Table name for storing metadata.
+  name: "documents"
+  # Primary key column name.
+  id_column: "id"
+  # Column name for storing raw text chunks.
+  text_column: "chunk_text"
+  # Column name for storing tags/keywords, must be of type VARCHAR[].
+  tags_column: "tags"
+  
+  # Defines which columns to return in search results.
+  # This helps control the amount of information returned to the Agent.
+  retrieval_columns: 
+    - "id"
+    - "doc_id"
+    - "url"
+    - "chunk_text"
+    - "tags"
+    - "meta"
+
+  # Defines which columns support direct, non-vector exact match searches.
+  # (This feature is reserved and not yet implemented in RAGQueryNode, but configuring it is good practice)
+  direct_search_columns: ["doc_id", "url"]
+
+# ----------------------------------------------------------------
+# Embedding Table Configuration
+# ----------------------------------------------------------------
+embedding_table:
+  # Table name for storing embedding vectors.
+  name: "embeddings"
+  # Foreign key column name, must match the id_column of the metadata table.
+  id_column: "id"
+
+  # Name of the embedding vector column.
+  # For writable data sources, a single string (single column) is recommended, as process_pending_embeddings
+  # generates embeddings for only one model at a time.
+  embedding_column: "embedding_vector"
+  
+  # Specifies the model used to generate embeddings.
+  # "jina-api": Indicates the use of Jina's online API service.
+  # It can also be a Hugging Face path for a local model, e.g., "jinaai/jina-embeddings-v3-base-zh".
+  emb_model_id: "jina-api"
+  
+  # Matryoshka Relevant Dimensions (MRL) - the target dimension for the embedding vector.
+  # For MRL models that require truncation or processing, the final dimension is specified here.
+  # For non-MRL models, this is usually ignored, but it's best to match the model's output dimension.
+  # Jina v3 outputs 1024 dimensions, but MRL to 128 or 256 is generally recommended.
+  mrl_dims: 128
+  
+  # Specifies the embedding task type for different types of text, which is required for some models (like Jina, BGE).
+  # Used when indexing documents/passages.
+  passage_task_type: "retrieval.passage"
+  # Used when encoding user queries.
+  query_task_type: "retrieval.query"
+
+  # Additional configuration parameters provided for the model provider.
+  # For "jina-api", this defines the model name used by the API and the environment variable for the API key.
+  model_config_params:
+    api_model_name: "jina-embeddings-v3"
+    api_key_env_var: "JINA_KEY" # The RAG service will read the API key from the JINA_KEY environment variable

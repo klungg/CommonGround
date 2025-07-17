@@ -1,0 +1,9 @@
+name: Associate_GenericExecutor
+base_profile: Base_Associate
+available_for_staffing: false
+description_for_human: "Executor agent responsible for carrying out specific tasks assigned by the Principal (English)."
+
+tool_access_policy:
+  allowed_toolsets:
+    # Specific toolsets for the Generic Executor can be defined here
+    - "G" # For example, allow it to search as well

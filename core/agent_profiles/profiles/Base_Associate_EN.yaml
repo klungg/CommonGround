@@ -1,0 +1,122 @@
+
+# V-Model Path Shortcuts: For use in `condition` and `payload` templates with v['<path>'] syntax.
+#
+# CORE NAMESPACES:
+#   - state:          (ctx.get("state")) Access this agent's private state (messages, inbox, flags). Ex: v['state.messages']
+#   - meta:           (ctx.get("meta")) Access this agent's metadata (agent_id, run_id). Ex: v['meta.agent_id']
+#   - team:           (ctx.get("refs.team")) Access shared team state (work_modules, etc). Ex: v['team.work_modules']
+#   - run:            (ctx.get("refs.run.meta")) Access global run metadata. Ex: v['run.run_type']
+#   - config:         (ctx.get("refs.run.config")) Access the run's config snapshot. Ex: v['config.agent_profiles_store']
+#
+# SHORTCUTS:
+#   - initial_params: (ctx.state.initial_parameters) Direct access to this agent's startup parameters. Ex: v['initial_params.module_id']
+#   - flags:          (ctx.state.flags) Direct access to this agent's internal flags. Ex: v['flags.initial_briefing_delivered']
+#
+# CROSS-CONTEXT SHORTCUTS:
+#   - principal:      Accesses the Principal Agent's private state. Ex: v['principal.messages']
+#   - partner:        Accesses the Partner Agent's private state. Ex: v['partner.messages']
+#
+# DEBUG/INTROSPECTION:
+#   - _self:          Returns the complete current SubContext object itself.
+#
+
+# USAGE IN `condition` FIELDS:
+#   - Existence check: "v['state.initial_parameters']"
+#   - Logic: "v['state.initial_parameters'] and not v['state.flags.initial_briefing_delivered']"
+#   - Default values: "(v['state.flags.consecutive_no_tool_call_count'] or 0) > 2"
+#   - The legacy `get_nested_value_from_context(...)` is also supported for backward compatibility.
+
+name: Base_Associate
+base_profile: Base_Agent
+type: associate
+llm_config_ref: "associate_llm"
+
+tool_access_policy:
+  allowed_toolsets:
+    - "flow_control_end"
+
+
+system_prompt_construction:
+  system_prompt_segments:
+    - id: system_current_date
+      type: static_text
+      content: "Current date (UTC): {{ state.agent_start_utc_timestamp }}"
+      order: 1
+    - id: associate_interaction_flow
+      type: static_text
+      order: 40
+      content: |-
+         Interaction Flow:
+         *   You receive instructions from the Principal.
+         *   You analyze the instructions and decide which tool(s) to call.
+         *   You call the appropriate tool(s).
+         *   Otherwise, after a tool executes, you'll typically analyze the result in the context of the instructions and decide the next tool call, or wait for new instructions if the sub-task is complete.
+    - id: agent_output_format
+      type: static_text
+      order: 50
+      content: |-
+        Output Format:
+        *   Be verbose before calling a tool, explaining what you see in previous messages and what you plan to do next.
+        *   DO NOT call tools without a clear, actionable plan; DO NOT call tools without a verbose explanation on what you see and what you plan to do next.
+      wrapper_tags: ["<internal>", "</internal>"]
+
+pre_turn_observers:
+  # 'observer_for_initial_briefing' has been removed as this is now handled by the Handover Protocol.
+
+post_turn_observers:
+  - id: "observer_reset_no_tool_call_counter"
+    type: "declarative"
+    condition: "v['state.current_action']"
+    action:
+      type: "update_state"
+      updates:
+        - operation: "set"
+          path: "flags.consecutive_no_tool_call_count"
+          value: 0
+
+  - id: "observer_increment_no_tool_call_counter"
+    type: "declarative"
+    condition: "not v['state.current_action']"
+    action:
+      type: "update_state"
+      updates:
+        - operation: "increment"
+          path: "flags.consecutive_no_tool_call_count"
+
+flow_decider:
+  - id: "rule_tool_call_exists"
+    condition: "v['state.current_action']"
+    action:
+      type: "continue_with_tool"
+
+  - id: "rule_immediate_meltdown_on_empty_content"
+    condition: "not v['state.current_action'] and len((v['state.messages'] or [{}])[-1].get('content', '').strip()) == 0"
+    action:
+      type: "end_agent_turn"
+      outcome: "success"
+
+  - id: "rule_consecutive_loops_meltdown"
+    condition: "(v['state.flags.consecutive_no_tool_call_count'] or 0) > 2"
+    action:
+      type: "end_agent_turn"
+      outcome: "error"
+      error_message: "Associate Agent failed to make progress after 3 consecutive attempts without tool calls."
+
+  # - id: "rule_no_tool_call_fallback"
+  #   condition: "True"
+  #   action:
+  #     type: "loop_with_inbox_item"
+  #     payload:
+  #       content_key: "associate_self_reflection_on_no_tool_call"
+
+text_definitions:
+  associate_self_reflection_on_no_tool_call: |-
+    <internal_system_directive>
+    Observation: In your previous turn, you did not call any specific tool.
+    Current Work Module: '{{ meta.module_description }}'
+    Instruction:
+    1. Re-evaluate your progress on this module.
+    2. If you believe your work is complete, you MUST synthesis. In its `current_associate_findings` parameter, provide a comprehensive summary of your findings and deliverables. This will conclude your work on this module.
+    3. If you are not finished, determine the next appropriate tool call to continue your work.
+    4. If you are stuck, clearly explain why.
+    </internal_system_directive>

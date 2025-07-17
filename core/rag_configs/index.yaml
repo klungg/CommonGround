@@ -1,0 +1,17 @@
+# ================================================================
+# RAG Data Source Master Index File
+# ================================================================
+#
+# This file defines which data sources the RAG system will load at startup,
+# and which data source is the default target for writing new data (e.g., user-uploaded documents).
+
+# Each entry in the `active_sources` list must have a corresponding .yaml
+# configuration file with the same name in the `rag_configs/` directory.
+active_sources:
+  # - arxiv_search_source      # Corresponds to arxiv_search_source.yaml, a read-only external ArXiv abstract database
+  - internal_project_docs    # Corresponds to internal_project_docs.yaml, a writable internal database for indexing project files
+
+# `default_writable_source` specifies which data source data should be written to
+# when an Agent calls the rag_add tool. This value must be one of the `active_sources`,
+# and its corresponding YAML file must have `database_writable` set to true.
+default_writable_source: "internal_project_docs"

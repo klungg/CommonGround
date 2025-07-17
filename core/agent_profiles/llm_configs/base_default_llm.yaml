@@ -1,0 +1,16 @@
+name: base_default_llm
+type: llm_config
+description_for_human: "Base LLM configuration with common defaults."
+
+# Core configuration payload
+config:
+  api_key:
+    _type: "from_env"
+    var: "DEFAULT_API_KEY"
+    required: false # Usually the API Key is required, but here it is set to false to allow it to be provided in other ways
+  api_base:
+    _type: "from_env"
+    var: "DEFAULT_BASE_URL"
+    required: false
+  max_retries: 2
+  wait_seconds_on_retry: 3
