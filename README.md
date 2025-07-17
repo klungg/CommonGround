@@ -130,7 +130,7 @@ This mode is for developers who want to modify the core application or use diffe
     uv sync          # Install Python dependencies
     cp env.sample .env # Create your local environment file
     # Edit .env to configure your LLM provider if not using the default
-    python run_server.py
+    uv run run_server.py
     ```
     The backend will be running on `http://localhost:8000`.
 
