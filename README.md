@@ -102,13 +102,14 @@ This is the easiest way to get the full system running, including the pre-config
     
     If you prefer to use a Gemini API key instead of OAuth authentication, you can skip the login step entirely:
     
-    1. Set your Gemini API key as an environment variable:
+    1. Create a `.env` file in the `deployment` directory with your Gemini API key:
        ```bash
-       export GEMINI_API_KEY=your_gemini_api_key_here
+       # In the deployment directory, create a .env file
+       echo "GEMINI_API_KEY=your_gemini_api_key_here" > .env
        ```
-       Or on Windows PowerShell:
-       ```powershell
-       $env:GEMINI_API_KEY = "your_gemini_api_key_here"
+       Or create it manually with the following content:
+       ```
+       GEMINI_API_KEY=your_gemini_api_key_here
        ```
     
     2. Use the API key configuration file to start the services:
