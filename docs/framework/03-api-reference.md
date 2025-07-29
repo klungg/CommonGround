@@ -230,8 +230,6 @@ Directly requests CRUD operations on work modules, typically initiated by the `P
 *   **`view_model_update`**: The server pushes this event when a subscribed view model is updated.
     *   `run_id`
     *   `data`: `{"view_name": "flow_view" | "kanban_view" | "timeline_view", "model": object}`
-*   **`project_structure_updated`**: This system-level event is broadcast to all sessions when the project structure changes (e.g., a run is renamed or deleted).
-    *   `data`: `{"reason": "rename_run" | "delete_project" | ..., "details": object}`
 
 #### 3.4.2 LLM Interaction Events
 
@@ -273,6 +271,8 @@ Directly requests CRUD operations on work modules, typically initiated by the `P
     *   `run_id`, `data`: `{"knowledge_base": object | null, "error": "string | null"}`
 *   **`error`**: A generic error message.
     *   `run_id`, `agent_id`, `data`: `{"message": "string"}`
+*   **`project_structure_updated`**: This system-level event is broadcast to all active user sessions when the project structure changes (e.g., a run is renamed or deleted).
+    *   `data`: `{"reason": "rename_run" | "delete_project" | ..., "details": object}`
 
 ---
 

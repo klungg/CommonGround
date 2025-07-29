@@ -35,6 +35,9 @@ inheritance:
     condition: "v['state.current_action.parameters.module_id_to_assign']"
 ```
 
+#### 1.4 Managing Context Inheritance
+To prevent context from growing indefinitely and consuming excessive tokens, the framework provides a mechanism to control what gets passed between agents. When inheriting message histories (e.g., `as_payload_key: "inherited_messages"`), the system will automatically filter out any messages that have an internal `_no_handover` flag. This flag is automatically added to messages that are part of an agent's initial briefing, ensuring that an agent doesn't pass its own startup instructions on to the next agent in the chain. This is a key feature for maintaining performance in long-running, multi-agent tasks.
+
 ## 2. Optimizing External Tools with MCP Prompt Overrides
 
 #### 2.1 Purpose

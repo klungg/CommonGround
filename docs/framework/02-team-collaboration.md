@@ -103,7 +103,7 @@ graph TD
     1.  **Requirements Communication**: Dialogues with the user to understand, clarify, and finalize task objectives and scope.
     2.  **Initial Planning**: Discusses with the user and uses the `manage_work_modules` tool to create initial high-level Work Modules.
     3.  **Team Formation**: Confirms with the user the types of Associate Agents needed for the task (e.g., a web search expert vs. a code execution expert).
-    4.  **Launch and Monitor**: After receiving user consent, uses the `LaunchPrincipalExecutionTool` to start the Principal Agent. This tool sends an `AGENT_STARTUP_BRIEFING` event to the Principal's `inbox`. While the Principal is running, the Partner can use `GetPrincipalStatusSummaryTool` to fetch progress and report back to the user.
+    4.  **Launch and Monitor**: After receiving user consent, and **ensuring at least one actionable Work Module exists in the plan**, uses the `LaunchPrincipalExecutionTool` to start the Principal Agent. This tool sends an `AGENT_STARTUP_BRIEFING` event to the Principal's `inbox`. While the Principal is running, the Partner can use `GetPrincipalStatusSummaryTool` to fetch progress and report back to the user.
 
 ### 2.2 Principal Agent
 
@@ -123,7 +123,7 @@ graph TD
     1.  **Task Execution**: Receives a work module assigned by the Principal via the `DispatcherNode`. The `DispatcherNode` sends an `AGENT_STARTUP_BRIEFING` event to its `inbox`, which contains all the details of the module.
     2.  **Tool Usage**: Uses specific tools (like `web_search`, `visit_url`) according to the task requirements and its own Profile configuration.
     3.  **Deliverable Submission**: After completing the task, calls the `generate_message_summary` tool to get an instructional prompt, then summarizes the results into a structured JSON `deliverables` object.
-*   **Context and State**: Each Associate Agent operates in an isolated context. **The key difference is** that upon completion, its **entire context** (message history, `deliverables`, etc.) is **collected by the `DispatcherNode` and archived into the `context_archive` of the specific work module it handled**. This realizes the core concept of "context follows the work."
+*   **Context and State**: Each Associate Agent operates in an isolated context. **The key difference is** that upon completion, its **entire context** (message history, `deliverables`, etc.) is **collected by the `DispatcherNode` and archived into the `context_archive` of the specific work module it handled**. The system also intelligently filters this context to prevent irrelevant history from being passed on to subsequent agents, optimizing token usage. This realizes the core concept of "context follows the work."
 
 ## 3. Instruction Generator Tool Pattern
 
