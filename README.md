@@ -143,26 +143,38 @@ This mode is for developers who want to modify the core application or use diffe
 
 **Steps**:
 
-1.  **Start the Backend**:
-    ```bash
-    cd core
-    uv venv           # Create a virtual environment
-    uv sync          # Install Python dependencies
-    cp env.sample .env # Create your local environment file
-    # Edit .env to configure your LLM provider if not using the default
-    uv run run_server.py
-    ```
-    The backend will be running on `http://localhost:8000`.
 
-2.  **Start the Frontend**:
-    Open a **new terminal**.
-    ```bash
-    cd frontend
-    cp .env.example .env.local
-    npm install
-    npm run dev
-    ```
-    The frontend will be accessible at `http://localhost:3000`.
+#### Step 1: Start gemini-cli-mcp-openai-bridge
+
+```bash
+git submodule update --init --recursive
+cd deployment/gemini-cli-mcp-openai-bridge
+# Follow the README instructions to start gemini-cli-mcp-openai-bridge and make sure it is running successfully
+```
+We will use this bridge to enable Gemini support for Common Ground.
+
+#### Step 2: Start the Backend Service
+
+```bash
+cd core
+uv venv           # Create a virtual environment
+uv sync           # Install Python dependencies
+cp env.sample .env # Create your local environment file
+# Edit .env to configure your LLM provider if not using the default
+uv run run_server.py
+```
+Once started, the backend will be available at: `http://localhost:8000`.
+
+#### Step 3: Start the Frontend Service
+
+Open a **new terminal** and run:
+```bash
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+Once started, the frontend will be available at: `http://localhost:3000`.
 
 ## 🛠️ Customization & Extensibility
 
