@@ -333,7 +333,12 @@ def _serialize_file_entry(base_dir: str, path: str) -> Dict[str, Any]:
         "is_directory": is_dir,
         "size": stat_result.st_size if not is_dir else None,
         "modified_at": datetime.fromtimestamp(stat_result.st_mtime, tz=timezone.utc).isoformat(),
-    }
+}
+
+
+def _is_hidden_asset(rel_path: str) -> bool:
+    normalized = rel_path.replace("\\", "/")
+    return normalized.split("/")[0] == ".deleted"
 
 
 def _calculate_directory_size(directory: str) -> int:
@@ -378,9 +383,15 @@ async def list_project_files(project_id: str):
     for root, dirs, files in os.walk(assets_dir):
         for directory in dirs:
             dir_path = os.path.join(root, directory)
+            rel_dir = os.path.relpath(dir_path, assets_dir)
+            if _is_hidden_asset(rel_dir):
+                continue
             entries.append(_serialize_file_entry(assets_dir, dir_path))
         for file_name in files:
             file_path = os.path.join(root, file_name)
+            rel_file = os.path.relpath(file_path, assets_dir)
+            if _is_hidden_asset(rel_file):
+                continue
             entries.append(_serialize_file_entry(assets_dir, file_path))
 
     # Sort directories first, then files by name
@@ -501,6 +512,10 @@ async def rename_project_file(project_id: str, file_path: str, payload: Dict[str
     new_extension = os.path.splitext(destination_path)[1].lower()
     if new_extension and new_extension not in ALLOWED_FILE_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"File type '{new_extension}' is not allowed.")
+
+    rel_destination = os.path.relpath(destination_path, assets_dir)
+    if _is_hidden_asset(rel_destination):
+        raise HTTPException(status_code=400, detail="Destination path is reserved by the system.")
 
     # Ensure destination directory exists within assets
     dest_dir = os.path.dirname(destination_path)
