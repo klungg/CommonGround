@@ -544,3 +544,24 @@ async def broadcast_project_structure_update(reason: str, details: Dict[str, Any
     ]
     if broadcast_tasks:
         await asyncio.gather(*broadcast_tasks)
+
+
+async def broadcast_project_files_update(project_id: str, change_type: str, details: Dict[str, Any]):
+    """Broadcasts project file change notifications to all sessions."""
+    message = {
+        "type": "project_files_updated",
+        "data": {
+            "project_id": project_id,
+            "change_type": change_type,
+            "details": details,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+    tasks = [
+        manager.send_json(run_id=None, message=message)
+        for manager in active_event_managers
+        if manager.is_connected
+    ]
+    if tasks:
+        await asyncio.gather(*tasks)

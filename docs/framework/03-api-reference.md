@@ -84,7 +84,11 @@ These RESTful endpoints are used to manage project and run metadata.
 *   **`PUT /project/{project_id}`**: Updates project metadata.
     *   **Request Body**: `{"name": "Updated Project Name"}`
 *   **`DELETE /project/{project_id}`**: Deletes a project (soft delete).
-*   **`POST /project/{project_id}/upload`**: Uploads a file to the project's `assets` directory.
+*   **`GET /project/{project_id}/files`**: Lists project asset files with metadata.
+*   **`POST /project/{project_id}/files`**: Uploads one or more files to the project's `assets` directory.
+*   **`GET /project/{project_id}/files/{path}`**: Downloads a specific project file.
+*   **`PUT /project/{project_id}/files/{path}`**: Renames or moves a project file within `assets`.
+*   **`DELETE /project/{project_id}/files/{path}`**: Soft-deletes a project file (archived under `.deleted`).
 *   **`PUT /run/{run_id}`**: Updates run metadata.
 *   **`DELETE /run/{run_id}`**: Deletes a run (soft delete).
 *   **`PUT /run/{run_id}/name`**: Renames a run.

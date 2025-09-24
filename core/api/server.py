@@ -3,9 +3,10 @@ import logging
 import asyncio
 import os
 import shutil
-from typing import Dict, List
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status, Request, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status, Request, Query, UploadFile, File, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from agent_core.iic.core.event_handler import EventHandler as IICEventHandler
@@ -15,8 +16,19 @@ from agent_core.iic.core.event_handler import EventHandler as IICEventHandler
 # Remove imports for get_session, remove_session as they are part of the old session management
 # create_session is still needed, but its invocation will change
 from .session import create_session, pending_websocket_sessions, active_runs_store, active_event_managers # <--- Modified import
-from api.events import SessionEventManager
-from agent_core.iic.core.iic_handlers import list_projects, get_project, create_project, delete_project, update_project, update_run_meta, delete_run, update_run_name, move_iic
+from api.events import SessionEventManager, broadcast_project_files_update
+from agent_core.iic.core.iic_handlers import (
+    list_projects,
+    get_project,
+    create_project,
+    delete_project,
+    update_project,
+    update_run_meta,
+    delete_run,
+    update_run_name,
+    move_iic,
+    get_iic_dir,
+)
 # Import server_manager startup/shutdown functions
 from agent_core.services.server_manager import lifespan_manager
 # Import the new message handler registry
@@ -26,6 +38,10 @@ from .metadata import fetch_metadata, MetadataResponse
 
 # Configure logging (can be handled by run_server.py, or called here as well)
 logger = logging.getLogger(__name__)
+
+ALLOWED_FILE_EXTENSIONS = {".txt", ".md", ".py", ".rst", ".yaml", ".yml", ".json"}
+MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB per file
+MAX_PROJECT_STORAGE_BYTES = 50 * 1024 * 1024  # 50 MB per project assets directory
 
 # Create FastAPI application
 app = FastAPI(title="PocketFlow Search Agent API", lifespan=lifespan_manager)
@@ -275,14 +291,8 @@ async def create_new_project(request: Request):
         raise HTTPException(status_code=400, detail="Missing 'name' in request body.")
     return create_project(name)
 
-@app.post("/project/{project_id}/upload")
-async def upload_file_to_project(project_id: str, file: UploadFile = File(...)):
-    """
-    Uploads a file to a specific project's 'assets' subdirectory.
-    The file monitor will automatically detect and index it.
-    """
-    from agent_core.iic.core.iic_handlers import get_iic_dir
-    
+def _ensure_assets_dir(project_id: str) -> str:
+    """Returns the absolute assets directory for a project, ensuring it exists."""
     project_path_str = get_iic_dir(project_id)
     if not project_path_str or not os.path.isdir(project_path_str):
         raise HTTPException(status_code=404, detail=f"Project with ID '{project_id}' not found.")
@@ -291,29 +301,244 @@ async def upload_file_to_project(project_id: str, file: UploadFile = File(...)):
     try:
         os.makedirs(assets_dir, exist_ok=True)
     except OSError as e:
-        logger.error("assets_directory_creation_failed", extra={"assets_dir": assets_dir, "error": str(e)}, exc_info=True)
+        logger.error(
+            "assets_directory_creation_failed",
+            extra={"assets_dir": assets_dir, "error": str(e)},
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail="Could not create assets directory on the server.")
 
-    # Simple security check to prevent filename from containing path traversal characters
-    # os.path.basename will remove path information, providing a layer of protection
-    safe_filename = os.path.basename(file.filename)
-    if not safe_filename:
-        raise HTTPException(status_code=400, detail="Invalid filename.")
+    return os.path.abspath(assets_dir)
 
-    file_location = os.path.join(assets_dir, safe_filename)
-    
-    if os.path.exists(file_location):
-        raise HTTPException(status_code=409, detail=f"File '{safe_filename}' already exists in this project's assets.")
+
+def _resolve_asset_path(project_id: str, relative_path: str) -> str:
+    """Resolves a relative asset path to an absolute path under the assets directory."""
+    assets_dir = _ensure_assets_dir(project_id)
+    normalized = os.path.normpath(os.path.join(assets_dir, relative_path))
+
+    if not normalized.startswith(assets_dir):
+        raise HTTPException(status_code=400, detail="Invalid path.")
+
+    return normalized
+
+
+def _serialize_file_entry(base_dir: str, path: str) -> Dict[str, Any]:
+    """Turns a filesystem entry into metadata for API responses."""
+    rel_path = os.path.relpath(path, base_dir)
+    is_dir = os.path.isdir(path)
+    stat_result = os.stat(path)
+    return {
+        "name": os.path.basename(path),
+        "path": rel_path.replace(os.sep, "/"),
+        "is_directory": is_dir,
+        "size": stat_result.st_size if not is_dir else None,
+        "modified_at": datetime.fromtimestamp(stat_result.st_mtime, tz=timezone.utc).isoformat(),
+    }
+
+
+def _calculate_directory_size(directory: str) -> int:
+    total_size = 0
+    for root, _, files in os.walk(directory):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            if os.path.isfile(file_path):
+                total_size += os.path.getsize(file_path)
+    return total_size
+
+
+def _get_upload_size(upload: UploadFile) -> int:
+    file_obj = upload.file
+    current_position = file_obj.tell()
+    file_obj.seek(0, os.SEEK_END)
+    size = file_obj.tell()
+    file_obj.seek(current_position)
+    return size
+
+
+def _soft_delete_asset(project_id: str, absolute_path: str) -> str:
+    assets_dir = _ensure_assets_dir(project_id)
+    deleted_dir = os.path.join(assets_dir, ".deleted")
+    os.makedirs(deleted_dir, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    base_name = os.path.basename(absolute_path)
+    archive_name = f"{timestamp}_{base_name}"
+    archive_path = os.path.join(deleted_dir, archive_name)
+
+    shutil.move(absolute_path, archive_path)
+    return archive_path
+
+
+@app.get("/project/{project_id}/files")
+async def list_project_files(project_id: str):
+    """Returns a recursive listing of project asset files with metadata."""
+    assets_dir = _ensure_assets_dir(project_id)
+
+    entries: List[Dict[str, Any]] = []
+    for root, dirs, files in os.walk(assets_dir):
+        for directory in dirs:
+            dir_path = os.path.join(root, directory)
+            entries.append(_serialize_file_entry(assets_dir, dir_path))
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            entries.append(_serialize_file_entry(assets_dir, file_path))
+
+    # Sort directories first, then files by name
+    entries.sort(key=lambda item: (not item["is_directory"], item["path"]))
+    return {"files": entries}
+
+
+@app.post("/project/{project_id}/files")
+async def upload_project_files(project_id: str, files: List[UploadFile] = File(...)):
+    """Uploads one or more files into the project's assets directory."""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded.")
+
+    assets_dir = _ensure_assets_dir(project_id)
+    saved_files: List[Dict[str, Any]] = []
+    total_usage = _calculate_directory_size(assets_dir)
+
+    for upload in files:
+        safe_name = os.path.basename(upload.filename or "")
+        if not safe_name:
+            raise HTTPException(status_code=400, detail="Invalid filename.")
+
+        extension = os.path.splitext(safe_name)[1].lower()
+        if extension and extension not in ALLOWED_FILE_EXTENSIONS:
+            raise HTTPException(status_code=400, detail=f"File type '{extension}' is not allowed.")
+
+        file_size = _get_upload_size(upload)
+        if file_size > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail=f"File '{safe_name}' exceeds the {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB limit.")
+
+        if total_usage + file_size > MAX_PROJECT_STORAGE_BYTES:
+            raise HTTPException(status_code=413, detail="Project storage quota exceeded. Delete files before uploading new ones.")
+
+        destination = os.path.join(assets_dir, safe_name)
+        if os.path.exists(destination):
+            raise HTTPException(status_code=409, detail=f"File '{safe_name}' already exists.")
+
+        try:
+            with open(destination, "wb") as out_file:
+                shutil.copyfileobj(upload.file, out_file)
+        except Exception as e:
+            logger.error(
+                "file_upload_save_failed",
+                extra={"file_location": destination, "error": str(e)},
+                exc_info=True,
+            )
+            raise HTTPException(status_code=500, detail="Could not save uploaded file.")
+        finally:
+            await upload.close()
+
+        logger.info(
+            "file_upload_success",
+            extra={"filename": safe_name, "project_id": project_id, "file_location": destination},
+        )
+        saved_files.append(_serialize_file_entry(assets_dir, destination))
+        total_usage += file_size
+
+    asyncio.create_task(
+        broadcast_project_files_update(project_id, "created", {"files": saved_files})
+    )
+
+    return {"uploaded": saved_files}
+
+
+@app.get("/project/{project_id}/files/{file_path:path}")
+async def download_project_file(project_id: str, file_path: str):
+    """Streams a project asset file back to the client."""
+    absolute_path = _resolve_asset_path(project_id, file_path)
+
+    if not os.path.exists(absolute_path) or not os.path.isfile(absolute_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    return FileResponse(absolute_path, filename=os.path.basename(absolute_path))
+
+
+@app.delete("/project/{project_id}/files/{file_path:path}")
+async def delete_project_file(project_id: str, file_path: str):
+    """Deletes a file from the project's assets directory."""
+    absolute_path = _resolve_asset_path(project_id, file_path)
+
+    if not os.path.exists(absolute_path) or not os.path.isfile(absolute_path):
+        raise HTTPException(status_code=404, detail="File not found.")
 
     try:
-        with open(file_location, "wb+") as file_object:
-            shutil.copyfileobj(file.file, file_object)
-        
-        logger.info("file_upload_success", extra={"filename": safe_filename, "project_id": project_id, "file_location": file_location})
-        return {"info": f"File '{safe_filename}' uploaded successfully to project '{project_id}'."}
+        archive_path = _soft_delete_asset(project_id, absolute_path)
+    except OSError as e:
+        logger.error(
+            "file_delete_failed",
+            extra={"file_path": absolute_path, "error": str(e)},
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to delete file.")
+
+    logger.info(
+        "file_delete_success",
+        extra={"file_path": absolute_path, "archived_to": archive_path, "project_id": project_id},
+    )
+    asyncio.create_task(
+        broadcast_project_files_update(project_id, "deleted", {"path": file_path})
+    )
+    return {"deleted": file_path}
+
+
+@app.put("/project/{project_id}/files/{file_path:path}")
+async def rename_project_file(project_id: str, file_path: str, payload: Dict[str, str] = Body(...)):
+    """Renames or moves a file within the project's assets directory."""
+    new_path = payload.get("new_path")
+    if not new_path:
+        raise HTTPException(status_code=400, detail="Missing 'new_path'.")
+
+    source_path = _resolve_asset_path(project_id, file_path)
+    if not os.path.exists(source_path) or not os.path.isfile(source_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    assets_dir = _ensure_assets_dir(project_id)
+    destination_path = _resolve_asset_path(project_id, new_path)
+
+    new_extension = os.path.splitext(destination_path)[1].lower()
+    if new_extension and new_extension not in ALLOWED_FILE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"File type '{new_extension}' is not allowed.")
+
+    # Ensure destination directory exists within assets
+    dest_dir = os.path.dirname(destination_path)
+    os.makedirs(dest_dir, exist_ok=True)
+
+    if os.path.exists(destination_path):
+        raise HTTPException(status_code=409, detail="Destination already exists.")
+
+    try:
+        shutil.move(source_path, destination_path)
     except Exception as e:
-        logger.error("file_upload_save_failed", extra={"file_location": file_location, "error": str(e)}, exc_info=True)
-        raise HTTPException(status_code=500, detail="Could not save uploaded file.")
+        logger.error(
+            "file_rename_failed",
+            extra={"source": source_path, "destination": destination_path, "error": str(e)},
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to rename file.")
+
+    logger.info(
+        "file_rename_success",
+        extra={"project_id": project_id, "source": source_path, "destination": destination_path},
+    )
+    new_rel_path = os.path.relpath(destination_path, assets_dir).replace(os.sep, "/")
+    metadata = _serialize_file_entry(assets_dir, destination_path)
+
+    asyncio.create_task(
+        broadcast_project_files_update(
+            project_id,
+            "renamed",
+            {"old_path": file_path, "new_path": new_rel_path, "file": metadata},
+        )
+    )
+
+    return {
+        "old_path": file_path,
+        "new_path": new_rel_path,
+        "file": metadata,
+    }
 
 @app.put("/project/{project_id}")
 async def update_project_meta(project_id: str, request: Request):
@@ -412,5 +637,3 @@ async def get_metadata(url: str = Query(..., description="The URL for which to f
     except Exception as e:
         logger.error("metadata_fetch_failed", extra={"url": url, "error": str(e)})
         raise HTTPException(status_code=500, detail="Failed to fetch metadata")
-
-

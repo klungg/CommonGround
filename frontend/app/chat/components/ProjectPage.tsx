@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,8 @@ import { projectStore } from '@/app/stores/projectStore';
 import { selectionStore } from '@/app/stores/selectionStore';
 import LoadingSpinner from '@/components/layout/LoadingSpinner';
 import { ProjectWithRuns } from '@/lib/types';
+import { projectFilesStore } from '@/app/stores/projectFilesStore';
+import { ProjectService, ProjectFileMetadata } from '@/lib/api';
 
 interface ProjectPageProps {
   currentInput: string;
@@ -45,6 +47,7 @@ export const ProjectPage = observer(function ProjectPage({
   const currentProject = projects.find((p: ProjectWithRuns) => 
     p.project.project_id === selectionStore.selectedProject?.projectId
   );
+  const projectId = selectionStore.selectedProject?.projectId;
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingProjectName, setEditingProjectName] = useState('');
@@ -142,6 +145,96 @@ export const ProjectPage = observer(function ProjectPage({
     setEditingProjectName(projectName);
     setIsEditingName(true);
   };
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (projectId) {
+      projectFilesStore.ensureLoaded(projectId);
+    }
+  }, [projectId]);
+
+  const handleUploadButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!projectId) return;
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
+
+    try {
+      await projectFilesStore.upload(projectId, files);
+    } catch (error) {
+      console.error('Failed to upload files:', error);
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleDownload = async (file: ProjectFileMetadata) => {
+    if (!projectId || file.is_directory) return;
+    try {
+      const blob = await ProjectService.downloadProjectFile(projectId, file.path);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = file.name;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download file:', error);
+    }
+  };
+
+  const handleDelete = async (file: ProjectFileMetadata) => {
+    if (!projectId || file.is_directory) return;
+    const confirmed = window.confirm(`Delete ${file.name}?`);
+    if (!confirmed) return;
+    try {
+      await projectFilesStore.deleteFile(projectId, file.path);
+    } catch (error) {
+      console.error('Failed to delete file:', error);
+    }
+  };
+
+  const handleRename = async (file: ProjectFileMetadata) => {
+    if (!projectId || file.is_directory) return;
+    const newName = window.prompt('Enter new file name', file.name);
+    if (!newName || newName === file.name) return;
+
+    const directory = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : '';
+    const newPath = directory ? `${directory}/${newName}` : newName;
+
+    try {
+      await projectFilesStore.renameFile(projectId, file.path, newPath);
+    } catch (error) {
+      console.error('Failed to rename file:', error);
+    }
+  };
+
+  const formatSize = (size: number | null) => {
+    if (size === null || size === undefined) return '-';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const formatTimestamp = (iso: string) => {
+    try {
+      const date = new Date(iso);
+      return date.toLocaleString();
+    } catch {
+      return iso;
+    }
+  };
+
+  const projectFiles = projectId ? projectFilesStore.getFiles(projectId) : [];
+  const filesLoading = projectId ? projectFilesStore.isLoading(projectId) : false;
+  const filesUploading = projectId ? projectFilesStore.isUploading(projectId) : false;
+  const filesError = projectId ? projectFilesStore.getError(projectId) : null;
 
   // If project data is loading, show loading state.
   // But if there is already project data, it means an update is in progress, so don't show full-screen loading.
@@ -349,16 +442,83 @@ export const ProjectPage = observer(function ProjectPage({
               )}
             </div> */}
 
-            {/* Project Files Section */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-lg font-semibold">Project Files(Coming soon)</h2>
-                <Button variant="outline">+ New Files</Button>
+            {projectId && (
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-lg font-semibold">Project Files</h2>
+                  <div className="flex items-center gap-3">
+                    {filesUploading && <span className="text-sm text-gray-500">Uploading...</span>}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+                    <Button variant="outline" onClick={handleUploadButtonClick} disabled={filesUploading}>
+                      + Upload Files
+                    </Button>
+                  </div>
+                </div>
+
+                {filesError && (
+                  <div className="mb-3 text-sm text-destructive">{filesError}</div>
+                )}
+
+                {filesLoading ? (
+                  <div className="border rounded-lg p-6 text-center text-gray-500">
+                    Loading project files...
+                  </div>
+                ) : projectFiles.length === 0 ? (
+                  <div className="border rounded-lg p-6 text-center text-gray-400">
+                    <p>No files have been added yet.</p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-semibold text-gray-600">Name</th>
+                          <th className="px-4 py-2 text-left font-semibold text-gray-600">Size</th>
+                          <th className="px-4 py-2 text-left font-semibold text-gray-600">Modified</th>
+                          <th className="px-4 py-2 text-right font-semibold text-gray-600">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {projectFiles.map((file) => (
+                          <tr key={file.path}>
+                            <td className="px-4 py-2 text-gray-900">
+                              {file.is_directory ? `📁 ${file.name}` : file.name}
+                            </td>
+                            <td className="px-4 py-2 text-gray-500">{file.is_directory ? '-' : formatSize(file.size)}</td>
+                            <td className="px-4 py-2 text-gray-500">{formatTimestamp(file.modified_at)}</td>
+                            <td className="px-4 py-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                {!file.is_directory && (
+                                  <Button size="sm" variant="ghost" onClick={() => handleDownload(file)}>
+                                    Download
+                                  </Button>
+                                )}
+                                {!file.is_directory && (
+                                  <Button size="sm" variant="ghost" onClick={() => handleRename(file)}>
+                                    Rename
+                                  </Button>
+                                )}
+                                {!file.is_directory && (
+                                  <Button size="sm" variant="ghost" onClick={() => handleDelete(file)}>
+                                    Delete
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-              <div className="border rounded-lg p-4 text-center text-gray-400">
-                <p>No files have been added yet.</p>
-              </div>
-            </div>
+            )}
           </main>
         </div>
       </div>

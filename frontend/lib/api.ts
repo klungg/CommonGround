@@ -132,4 +132,64 @@ export class ProjectService {
       }),
     })
   }
-} 
+
+  // ---- Project Files ----
+  static async listProjectFiles(projectId: string): Promise<{ files: Array<ProjectFileMetadata> }> {
+    return this.fetchApi<{ files: Array<ProjectFileMetadata> }>(`/project/${projectId}/files`)
+  }
+
+  static async uploadProjectFiles(projectId: string, files: File[]): Promise<{ uploaded: ProjectFileMetadata[] }> {
+    if (!files.length) {
+      throw new Error('No files provided for upload')
+    }
+
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+
+    const url = `${config.api.baseUrl}/project/${projectId}/files`
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Upload failed: ${response.status} ${errorText}`)
+    }
+
+    return response.json()
+  }
+
+  static async deleteProjectFile(projectId: string, path: string): Promise<{ deleted: string }> {
+    return this.fetchApi<{ deleted: string }>(`/project/${projectId}/files/${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+    })
+  }
+
+  static async renameProjectFile(projectId: string, oldPath: string, newPath: string): Promise<{ old_path: string; new_path: string; file: ProjectFileMetadata }> {
+    return this.fetchApi<{ old_path: string; new_path: string; file: ProjectFileMetadata }>(
+      `/project/${projectId}/files/${encodeURIComponent(oldPath)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ new_path: newPath }),
+      }
+    )
+  }
+
+  static async downloadProjectFile(projectId: string, path: string): Promise<Blob> {
+    const url = `${config.api.baseUrl}/project/${projectId}/files/${encodeURIComponent(path)}`
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.statusText}`)
+    }
+    return response.blob()
+  }
+}
+
+export interface ProjectFileMetadata {
+  name: string
+  path: string
+  is_directory: boolean
+  size: number | null
+  modified_at: string
+}

@@ -9,6 +9,8 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent, FileDeletedEvent
 from typing import Dict, Any, List, Optional
 
+from api.events import broadcast_project_files_update
+
 # Import the websocket manager
 from .websocket_manager import manager
 
@@ -298,6 +300,9 @@ class ProjectChangeHandler(FileSystemEventHandler):
         if not project_id:
             return
 
+        if '/.deleted/' in event.src_path or event.src_path.endswith('/.deleted'):
+            return
+
         # --- RAG Indexing Logic (with debouncing for project-level updates) ---
         file_ext = os.path.splitext(event.src_path)[1].lower()
         if file_ext in SUPPORTED_DOC_EXTENSIONS:
@@ -348,6 +353,16 @@ class ProjectChangeHandler(FileSystemEventHandler):
         asyncio.run_coroutine_threadsafe(
             manager.broadcast(message, project_id), 
             self.loop
+        )
+        asyncio.run_coroutine_threadsafe(
+            broadcast_project_files_update(
+                project_id,
+                "synced",
+                {
+                    "tree": new_tree,
+                },
+            ),
+            self.loop,
         )
         if project_id in self.debounce_timers:
             del self.debounce_timers[project_id]

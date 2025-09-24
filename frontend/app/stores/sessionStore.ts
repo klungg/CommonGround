@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction, computed } from 'mobx';
 import { v4 as uuidv4 } from 'uuid';
 import { CSSProperties } from 'react';
 import { selectionStore } from './selectionStore'; // Import selectionStore
+import { projectFilesStore } from './projectFilesStore';
 import { config } from '@/app/config';
 import { ProjectService } from '@/lib/api';
 import type { Turn as OriginalTurn, ToolInteraction } from '@/app/chat/types/conversation'; // <-- New import
@@ -418,6 +419,16 @@ export interface ProjectStructureUpdated {
   };
 }
 
+export interface ProjectFilesUpdatedEvent {
+  type: 'project_files_updated';
+  data: {
+    project_id: string;
+    change_type: string;
+    details: Record<string, unknown>;
+    timestamp: string;
+  };
+}
+
 export interface TokenUsageStats {
     total_prompt_tokens: number;
     total_completion_tokens: number;
@@ -448,6 +459,7 @@ export type WebSocketMessage =
   | AssociateExecutionStarted
   | AssociateExecutionEnded
   | WorkModuleUpdated
+  | ProjectFilesUpdatedEvent
   | ViewModelUpdate
   | ViewModelUpdateFailed
   | TurnsSync
@@ -698,7 +710,14 @@ class SessionStore {
       };
 
       ws.onclose = () => {
-        this.ws = null;
+        runInAction(() => {
+          this.ws = null;
+          this.isConnected = false;
+        });
+        const currentProjectId = selectionStore.selectedProject?.projectId;
+        if (currentProjectId) {
+          projectFilesStore.ensureLoaded(currentProjectId, true);
+        }
       };
     });
   }
@@ -880,6 +899,11 @@ class SessionStore {
         console.log('Project structure update event received:', data.data);
         // Trigger a global refresh of the project list
         selectionStore.triggerProjectsRefresh();
+        break;
+      }
+      case 'project_files_updated': {
+        const update = data as ProjectFilesUpdatedEvent;
+        projectFilesStore.handleWebsocketUpdate(update.data);
         break;
       }
       default: {
