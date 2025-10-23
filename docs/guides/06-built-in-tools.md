@@ -20,6 +20,19 @@ By default, the `Associate_WebSearcher` profiles are configured to use the `G` t
 
 This configuration works out of the box without needing any API keys.
 
+### File Access for Gemini Tools
+
+To let the Gemini-backed tools read uploads (for example via `G_glob`), the bridge server must be pointed at the same `projects/` directory used by the FastAPI runtime.
+
+- **Docker (`deployment/docker-compose*.yaml`)** mounts the repository's `core/projects` into both containers and sets `COMMON_GROUND_PROJECTS_DIR=/app/projects`, so no extra work is required as long as your uploads live under `core/projects`.
+- **Local uv/npm development**: define the variable before starting the bridge. The easiest approach is to create a repository root `.env` (if you don't already have one) with:
+
+  ```env
+  COMMON_GROUND_PROJECTS_DIR=/absolute/path/to/core/projects
+  ```
+
+  Use an absolute path so the bridge can resolve the directory regardless of where you launch it from. The bridge also looks for `.env` files in its own directory, so you can alternatively export the variable in your shell or add it to `deployment/gemini-cli-mcp-openai-bridge/bridge-server/.env`. When this variable is present you do not need to pass `--target-dir` manually; the bridge will default to the provided path.
+
 ## 3. Alternative Provider: Jina API
 
 The framework also includes built-in support for the Jina Search and Visit APIs, which can provide high-quality search results and page content.

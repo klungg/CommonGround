@@ -10,6 +10,9 @@ services:
     command: ["npm", "run", "start", "--", "--host", "0.0.0.0", "--resolve-redirects"]
     ports:
       - "8765:8765"
+    volumes:
+      - ~/.gemini:/root/.gemini
+      - ../core/projects:/app/projects
     environment:
       # Uncomment and set the following environment variables if you prefer to use API key authentication
       # instead of OAuth authentication. These variables should be set in the bridge service.
@@ -26,6 +29,7 @@ services:
       # OAuth callback configuration (required for OAuth authentication)
       - OAUTH_CALLBACK_PORT=8766
       - OAUTH_CALLBACK_HOST=0.0.0.0
+      - COMMON_GROUND_PROJECTS_DIR=/app/projects
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     healthcheck:
       test: ["CMD", "node", "-e", "const net = require('net'); const client = net.createConnection({port: 8765}, () => {console.log('OK'); client.end(); process.exit(0);}); client.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 5000);"]
@@ -47,7 +51,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./projects:/app/projects
+      - ../core/projects:/app/projects
       - ./mcp.json:/app/mcp.json
       - ../core/agent_profiles/llm_configs:/app/agent_profiles/llm_configs
       - ../core/agent_profiles/profiles:/app/agent_profiles/profiles
