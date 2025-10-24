@@ -205,7 +205,7 @@ class EventHandler:
                 if run_id not in index_data or index_data[run_id] != filename:
                     index_data[run_id] = filename
                     await _write_project_index(project_path, index_data)
-                    logger.info("run_added_to_project_index", extra={"run_id": run_id, "filename": filename, "project_path": project_path})
+                    logger.info("run_added_to_project_index", extra={"run_id": run_id, "iic_filename": filename, "project_path": project_path})
             except Exception as e:
                 logger.error("project_index_update_failed_sync", extra={"run_id": run_id, "error": str(e)}, exc_info=True)
 

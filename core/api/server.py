@@ -39,7 +39,7 @@ from .metadata import fetch_metadata, MetadataResponse
 # Configure logging (can be handled by run_server.py, or called here as well)
 logger = logging.getLogger(__name__)
 
-ALLOWED_FILE_EXTENSIONS = {".txt", ".md", ".py", ".rst", ".yaml", ".yml", ".json"}
+ALLOWED_FILE_EXTENSIONS = {".txt", ".md", ".py", ".rst", ".yaml", ".yml", ".json", ".pdf"}
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB per file
 MAX_PROJECT_STORAGE_BYTES = 50 * 1024 * 1024  # 50 MB per project assets directory
 
@@ -444,7 +444,7 @@ async def upload_project_files(project_id: str, files: List[UploadFile] = File(.
 
         logger.info(
             "file_upload_success",
-            extra={"filename": safe_name, "project_id": project_id, "file_location": destination},
+            extra={"uploaded_filename": safe_name, "project_id": project_id, "file_location": destination},
         )
         saved_files.append(_serialize_file_entry(assets_dir, destination))
         total_usage += file_size

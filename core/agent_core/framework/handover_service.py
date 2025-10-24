@@ -29,7 +29,7 @@ class HandoverService:
                         cls._protocols[protocol_name] = protocol_data
                         logger.info("handover_protocol_loaded", extra={"protocol_name": protocol_name})
             except Exception as e:
-                logger.error("handover_protocol_load_failed", extra={"filename": yaml_file.name, "error": str(e)})
+                logger.error("handover_protocol_load_failed", extra={"yaml_filename": yaml_file.name, "error": str(e)})
 
     @classmethod
     def get_protocol_schema(cls, protocol_name: str) -> Optional[Dict]:
