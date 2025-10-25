@@ -30,10 +30,18 @@ bridge:
 	exit 1
 
 api: bridge
-	$(MAKE) api-run
+	@echo "Launching API server in a new Terminal window with debug logging..."
+	@osascript -e 'tell application "Terminal"' \
+		-e 'activate' \
+		-e 'do script "cd \"$(CURDIR)/core\" && if [ ! -d .venv ]; then uv venv; fi; uv sync && uv run run_server.py --reload --log-level DEBUG"' \
+		-e 'end tell'
 
 frontend: bridge
-	$(MAKE) frontend-run
+	@echo "Launching frontend in a new Terminal window with debug logging..."
+	@osascript -e 'tell application "Terminal"' \
+		-e 'activate' \
+		-e 'do script "cd \"$(CURDIR)/frontend\" && npm install && LOG_LEVEL=debug NEXT_PUBLIC_LOG_LEVEL=debug npm run dev"' \
+		-e 'end tell'
 
 dev: bridge
 	@echo "Bridge is running in the background."
@@ -45,50 +53,19 @@ api-run:
 		uv venv; \
 	fi; \
 	uv sync && \
-	uv run run_server.py --reload
+	uv run run_server.py --reload --log-level DEBUG
 
 frontend-run:
-	cd frontend && npm install && npm run dev
+	cd frontend && npm install && LOG_LEVEL=debug NEXT_PUBLIC_LOG_LEVEL=debug npm run dev
 
 start: bridge
-	@echo "Bridge is healthy; starting API and frontend after short delay."; \
-	set -e; \
-	API_PID=""; \
-	FE_PID=""; \
-	cleanup() { \
-		if [ -n "$$API_PID" ]; then \
-			kill -TERM -$$API_PID 2>/dev/null || true; \
-			API_PID=""; \
-		fi; \
-		if [ -n "$$FE_PID" ]; then \
-			kill -TERM -$$FE_PID 2>/dev/null || true; \
-			FE_PID=""; \
-		fi; \
-	}; \
-	trap 'cleanup' EXIT; \
-	trap 'cleanup; exit 130' INT TERM; \
-	sleep 3; \
-	( \
-		set -e; \
-		cd core; \
-		if [ ! -d .venv ]; then \
-			echo "[api] Creating Python venv with uv"; \
-			uv venv; \
-		fi; \
-		echo "[api] Syncing dependencies with uv"; \
-		uv sync; \
-		echo "[api] Starting FastAPI dev server"; \
-		uv run run_server.py --reload \
-	) & \
-	API_PID=$$!; \
-	sleep 3; \
-	( \
-		set -e; \
-		cd frontend; \
-		echo "[frontend] Installing npm dependencies"; \
-		npm install; \
-		echo "[frontend] Starting Next.js dev server"; \
-		npm run dev \
-	) & \
-	FE_PID=$$!; \
-	wait $$API_PID $$FE_PID
+	@echo "Bridge is healthy; launching API and frontend terminals with debug logging."; \
+	osascript -e 'tell application "Terminal"' \
+		-e 'activate' \
+		-e 'do script "cd \"$(CURDIR)/core\" && if [ ! -d .venv ]; then uv venv; fi; uv sync && uv run run_server.py --reload --log-level DEBUG"' \
+		-e 'end tell'; \
+	sleep 2; \
+	osascript -e 'tell application "Terminal"' \
+		-e 'activate' \
+		-e 'do script "cd \"$(CURDIR)/frontend\" && npm install && LOG_LEVEL=debug NEXT_PUBLIC_LOG_LEVEL=debug npm run dev"' \
+		-e 'end tell'
