@@ -1,10 +1,10 @@
 "use client"
 
-import { ChevronDown, Plus, SquarePen, Trash2, MoreHorizontal, Siren, Bot, Frame, Cog, ExternalLink, Twitter, Rocket } from "lucide-react"
+import { ChevronDown, Plus, SquarePen, Trash2, MoreHorizontal, Siren, Bot, Frame, Cog, ExternalLink, Twitter, Rocket, FileText } from "lucide-react"
 import Image from "next/image"
 import React, { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { observer } from 'mobx-react-lite'
 import { projectStore } from "@/app/stores/projectStore"
 import { selectionStore } from "@/app/stores/selectionStore"
@@ -129,6 +129,7 @@ export const AppSidebar = observer(function AppSidebar() {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
   const [settingsLoading, setSettingsLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
 
   // Directly get data from the store, methods are called via projectStore.methodName()
   const { projects, loading } = projectStore
@@ -841,6 +842,21 @@ export const AppSidebar = observer(function AppSidebar() {
                   })}
               </SidebarMenu>
             )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Utilities</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <Link href="/pdf-to-markdown" className="w-full">
+                  <SidebarMenuButton className={pathname === '/pdf-to-markdown' ? 'bg-accent' : ''}>
+                    <FileText className="h-4 w-4" />
+                    <span>PDF → Markdown</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

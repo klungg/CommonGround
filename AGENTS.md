@@ -27,3 +27,8 @@ Use Conventional Commits (`feat:`, `fix:`, `docs:`) with scoped changes; no gene
 - `docs/guides/01-agent-profiles.md` — editing agent personas and flow deciders.
 - `docs/guides/03-advanced-customization.md` — extending observers, protocols, persistence.
 - `docs/guides/05-llm-providers.md` — configuring LiteLLM adapters, env keys, model overrides.
+
+## Non-Obvious Gotchas & Learnings
+- **Next.js base path:** `next.config.ts` sets `basePath: '/webview'`, so every app route—including the new PDF API proxy—lives under `/webview`. Client-side fetches must hit `/webview/api/...`; the PDF page now defaults to that path, but other tooling may still need the prefix.
+- **Gemini bridge auth:** The repo relies on the Dockerised Gemini CLI bridge and its OAuth state. Many configs (e.g., `core/agent_profiles/llm_configs/*`) still show placeholder API keys like `5678`, but real calls succeed because the OpenAI-compatible endpoint at `${GEMINI_BRIDGE_URL}/v1` handles auth transparently. When wiring new services, reuse that base URL instead of expecting an API key.
+- **PDF agent flow:** `core/api/pdf_agent_service.py` runs two sequential Gemini calls—first extraction, then formatting—without truncating the draft or enforcing a per-request timeout.

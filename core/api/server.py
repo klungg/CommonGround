@@ -35,6 +35,7 @@ from agent_core.services.server_manager import lifespan_manager
 from .message_handlers import MESSAGE_HANDLERS
 # Import metadata related modules
 from .metadata import fetch_metadata, MetadataResponse
+from .pdf_agent import router as pdf_agent_router
 
 # Configure logging (can be handled by run_server.py, or called here as well)
 logger = logging.getLogger(__name__)
@@ -45,6 +46,8 @@ MAX_PROJECT_STORAGE_BYTES = 50 * 1024 * 1024  # 50 MB per project assets directo
 
 # Create FastAPI application
 app = FastAPI(title="PocketFlow Search Agent API", lifespan=lifespan_manager)
+
+app.include_router(pdf_agent_router)
 
 # Add CORS middleware
 app.add_middleware(
