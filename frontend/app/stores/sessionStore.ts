@@ -4,7 +4,8 @@ import { CSSProperties } from 'react';
 import { selectionStore } from './selectionStore'; // Import selectionStore
 import { projectFilesStore } from './projectFilesStore';
 import { config } from '@/app/config';
-import { ProjectService } from '@/lib/api';
+import { ProjectService, ProjectFileMetadata } from '@/lib/api';
+import { escapePath, extractFileTags, normalizeRelativePath } from '@/app/utils/fileTagging';
 import type { Turn as OriginalTurn, ToolInteraction } from '@/app/chat/types/conversation'; // <-- New import
 
 // Define the shape of `llm_interaction` as we expect it, including `actual_usage`.
@@ -612,6 +613,91 @@ class SessionStore {
     }
   }
 
+  private buildPromptPayload(rawPrompt: string): { prompt: string; extraPayload?: Record<string, unknown> } {
+    const projectId = selectionStore.selectedFile?.projectId
+      ?? selectionStore.selectedProject?.projectId
+      ?? null;
+
+    if (!projectId) {
+      return { prompt: rawPrompt };
+    }
+
+    const projectFiles = projectFilesStore.getFiles(projectId);
+    if (projectFiles.length === 0) {
+      return { prompt: rawPrompt };
+    }
+
+    const tags = extractFileTags(rawPrompt);
+    if (tags.length === 0) {
+      return { prompt: rawPrompt };
+    }
+
+    const filesByPath = new Map<string, ProjectFileMetadata>();
+    projectFiles.forEach((file) => {
+      filesByPath.set(normalizeRelativePath(file.path), file);
+    });
+
+    const replacements: Array<{ start: number; end: number; replacement: string }> = [];
+    const uniqueAttachments = new Map<string, { relative_path: string; is_directory: boolean }>();
+    const unresolvedTags: string[] = [];
+
+    tags.forEach((tag) => {
+      const normalized = normalizeRelativePath(tag.path);
+      if (!normalized) {
+        return;
+      }
+
+      const metadata = filesByPath.get(normalized);
+      if (!metadata) {
+        unresolvedTags.push(tag.path);
+        return;
+      }
+
+      const canonicalPath = metadata.path;
+      const replacementPath = metadata.is_directory ? `${canonicalPath}/` : canonicalPath;
+      replacements.push({
+        start: tag.start + 1,
+        end: tag.end,
+        replacement: escapePath(replacementPath),
+      });
+
+      if (!uniqueAttachments.has(canonicalPath)) {
+        uniqueAttachments.set(canonicalPath, {
+          relative_path: canonicalPath,
+          is_directory: metadata.is_directory,
+        });
+      }
+
+    });
+
+    if (uniqueAttachments.size === 0) {
+      return {
+        prompt: rawPrompt,
+        extraPayload: unresolvedTags.length ? { unresolved_tags: unresolvedTags } : undefined,
+      };
+    }
+
+    let normalizedPrompt = rawPrompt;
+    replacements
+      .sort((a, b) => b.start - a.start)
+      .forEach((replacement) => {
+        normalizedPrompt = `${normalizedPrompt.slice(0, replacement.start)}${replacement.replacement}${normalizedPrompt.slice(replacement.end)}`;
+      });
+
+    const extraPayload: Record<string, unknown> = {
+      file_tags: Array.from(uniqueAttachments.values()),
+    };
+
+    if (unresolvedTags.length > 0) {
+      extraPayload.unresolved_tags = unresolvedTags;
+    }
+
+    return {
+      prompt: normalizedPrompt,
+      extraPayload,
+    };
+  }
+
   // New: Clear ViewModel and set waiting state
   clearViewModelsAndWait() {
     runInAction(() => {
@@ -919,12 +1005,20 @@ class SessionStore {
         return;
     }
 
+    const { prompt, extraPayload } = this.buildPromptPayload(message);
+
+    const data: Record<string, unknown> = {
+      run_id: runId,
+      message_payload: { prompt },
+    };
+
+    if (extraPayload && Object.keys(extraPayload).length > 0) {
+      data.extra_payload = extraPayload;
+    }
+
     this.ws.send(JSON.stringify({
         type: 'send_to_run',
-        data: {
-            run_id: runId,
-            message_payload: { prompt: message }
-        }
+        data,
     }));
   }
 

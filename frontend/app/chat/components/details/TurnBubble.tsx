@@ -11,7 +11,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Code, Info } from 'lucide-react';
+import { Code, Info, FileText, Folder, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ThinkingDots } from './ThinkingDots';
@@ -118,6 +118,11 @@ export const TurnBubble = observer(({ turn, isHighlighted = false, onNodeIdClick
   const llmInteraction = turn.llm_interaction;
   const tokenUsage = llmInteraction?.actual_usage;
   const isUserTurn = turn.agent_info.agent_id === 'User';
+  const attachments = isUserTurn ? (turn.inputs?.attachments ?? []) : [];
+  const aggregatedText = isUserTurn ? turn.inputs?.aggregated_text : undefined;
+  const absoluteFiles = isUserTurn ? (turn.inputs?.absolute_files ?? []) : [];
+  const attachmentWarnings = isUserTurn ? (turn.inputs?.attachment_warnings ?? []) : [];
+  const attachmentErrors = isUserTurn ? (turn.inputs?.attachment_errors ?? []) : [];
   
   const agentDisplayName = turn.agent_info.assigned_role_name || turn.agent_info.agent_id;
 
@@ -174,6 +179,57 @@ export const TurnBubble = observer(({ turn, isHighlighted = false, onNodeIdClick
         <Card className={`mt-1 ${isUserTurn ? 'bg-gray-50' : 'bg-white border-0 shadow-none'}`}>
           <CardContent className="p-3">
             <div className="prose prose-sm max-w-none break-words space-y-2">
+              {isUserTurn && attachments.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="uppercase tracking-wide text-gray-400">Attachments</span>
+                  {attachments.map((attachment) => (
+                    <Badge key={attachment.relative_path} variant="secondary" className="flex items-center gap-1">
+                      {attachment.is_directory ? <Folder size={12} /> : <FileText size={12} />}
+                      <span>{attachment.relative_path}</span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {isUserTurn && aggregatedText && (
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-2 text-xs whitespace-pre-wrap">
+                  {aggregatedText.trim()}
+                </div>
+              )}
+
+              {isUserTurn && absoluteFiles.length > 0 && (
+                <div className="flex flex-col gap-1 text-xs text-gray-500">
+                  <span className="font-medium">Resolved paths:</span>
+                  {absoluteFiles.map((path) => (
+                    <code key={path} className="break-all bg-white px-1 py-0.5 border rounded">
+                      {path}
+                    </code>
+                  ))}
+                </div>
+              )}
+
+              {isUserTurn && attachmentWarnings.length > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+                  <AlertTriangle size={14} className="mt-0.5" />
+                  <div className="space-y-1">
+                    {attachmentWarnings.map((warning, index) => (
+                      <div key={index}>{warning}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isUserTurn && attachmentErrors.length > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                  <AlertTriangle size={14} className="mt-0.5" />
+                  <div className="space-y-1">
+                    {attachmentErrors.map((error, index) => (
+                      <div key={index}>{error}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {displayContent && (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
               )}

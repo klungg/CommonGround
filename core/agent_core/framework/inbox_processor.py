@@ -69,6 +69,25 @@ class InboxProcessor:
             "metadata": {"client_source": "websocket"},
             "error_details": None,
         }
+
+        payload = item.get("payload") if isinstance(item, dict) else None
+        if isinstance(payload, dict):
+            attachments = payload.get("attachments")
+            if attachments:
+                user_turn["inputs"]["attachments"] = attachments
+            attachment_warnings = payload.get("attachment_warnings")
+            if attachment_warnings:
+                user_turn["inputs"]["attachment_warnings"] = attachment_warnings
+            attachment_errors = payload.get("attachment_errors")
+            if attachment_errors:
+                user_turn["inputs"]["attachment_errors"] = attachment_errors
+            aggregated_text = payload.get("aggregated_text")
+            if aggregated_text:
+                user_turn["inputs"]["aggregated_text"] = aggregated_text
+            absolute_files = payload.get("absolute_files")
+            if absolute_files:
+                user_turn["inputs"]["absolute_files"] = absolute_files
+
         team_state.setdefault("turns", []).append(user_turn)
         logger.debug("user_turn_created", extra={"agent_id": self.agent_id, "user_turn_id": user_turn_id})
         
@@ -258,6 +277,26 @@ class InboxProcessor:
                         "_no_handover": True,
                         "_source_event": "AGENT_STARTUP_BRIEFING"
                     }
+
+                parts_payload = payload.get("parts") if isinstance(payload, dict) else None
+                aggregated_text = payload.get("aggregated_text") if isinstance(payload, dict) else None
+                if aggregated_text:
+                    if injected_content:
+                        injected_content = f"{injected_content}\n\n{aggregated_text.strip()}"
+                    else:
+                        injected_content = aggregated_text.strip()
+                    new_message["content"] = injected_content
+
+                if isinstance(parts_payload, list) and parts_payload:
+                    if isinstance(new_message.get("content"), str):
+                        text_part = new_message["content"].strip()
+                        combined_parts: List[Any] = []
+                        if text_part:
+                            combined_parts.append({"type": "text", "text": text_part})
+                        combined_parts.extend(parts_payload)
+                        new_message["content"] = combined_parts
+                    else:
+                        new_message["content"] = parts_payload
                 
                 if role == "tool":
                     new_message["tool_call_id"] = dehydrated_payload.get("tool_call_id")
@@ -282,7 +321,11 @@ class InboxProcessor:
                     found = False
                     for msg in messages_for_llm:
                         if msg.get("role") == role:
-                            msg["content"] = f"{injected_content}\n\n---\n\n{msg['content']}"
+                            existing_content = msg.get("content")
+                            if isinstance(existing_content, list):
+                                existing_content.insert(0, {"type": "text", "text": injected_content})
+                            else:
+                                msg["content"] = f"{injected_content}\n\n---\n\n{existing_content}"
                             found = True
                             break
                     if not found:

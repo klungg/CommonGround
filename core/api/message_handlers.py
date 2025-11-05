@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import asdict
 from typing import Dict, Optional, Any, Tuple, List # Added List
 import coolname
 import uuid
@@ -24,6 +25,7 @@ from agent_profiles.loader import get_global_active_profile_by_logical_name_copy
 from agent_core.events.event_triggers import trigger_view_model_update # For view model updates
 from agent_core.nodes.custom_nodes.stage_planner_node import _apply_work_module_actions # For direct work module management
 from agent_core.utils.serialization import get_serializable_run_snapshot # New import
+from .file_tag_dispatcher import resolve_tagged_file_parts
 
 logger = logging.getLogger(__name__)
 
@@ -863,6 +865,39 @@ async def handle_send_to_run_message(ws_state: Dict, data: Dict):
     run_type = run_context['meta'].get('run_type')
     prompt_content = message_payload.get("prompt")
 
+    async def prepare_payload(prompt: str) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"prompt": prompt}
+        project_id = run_context.get("project_id")
+
+        if not isinstance(extra_payload, dict) or not project_id:
+            unresolved = extra_payload.get("unresolved_tags") if isinstance(extra_payload, dict) else None
+            if unresolved:
+                payload["attachment_warnings"] = [
+                    f"Unresolved tags ignored: {', '.join(map(str, unresolved))}"
+                ]
+            return payload
+
+        resolution = resolve_tagged_file_parts(project_id, extra_payload)
+        if resolution.parts:
+            payload["parts"] = resolution.parts
+        if resolution.text_blocks:
+            payload["aggregated_text"] = "".join(resolution.text_blocks)
+        if resolution.attachments:
+            payload["attachments"] = [asdict(meta) for meta in resolution.attachments]
+        if resolution.absolute_files:
+            payload["absolute_files"] = resolution.absolute_files
+        if resolution.warnings:
+            payload.setdefault("attachment_warnings", []).extend(resolution.warnings)
+        if resolution.errors:
+            payload.setdefault("attachment_errors", []).extend(resolution.errors)
+            for error_message in resolution.errors:
+                await event_manager.emit_error(
+                    run_id=target_run_id,
+                    agent_id="System",
+                    error_message=error_message,
+                )
+        return payload
+
     try:
         # --- Branch 1: Activate a pending run ---
         if run_status == 'CREATED':
@@ -872,6 +907,7 @@ async def handle_send_to_run_message(ws_state: Dict, data: Dict):
                 raise ValueError("First message to a new run must contain a 'prompt'.")
             
             run_context['team_state']['question'] = prompt_content
+            payload = await prepare_payload(prompt_content)
             
             task = None
             if run_type == "partner_interaction":
@@ -882,7 +918,7 @@ async def handle_send_to_run_message(ws_state: Dict, data: Dict):
                 inbox_item = {
                     "item_id": f"inbox_{uuid.uuid4().hex[:8]}",
                     "source": "USER_PROMPT", # Use standardized event source
-                    "payload": {"prompt": prompt_content},
+                    "payload": payload,
                     "consumption_policy": "consume_on_read",
                     "metadata": {"created_at": datetime.now(timezone.utc).isoformat()}
                 }
@@ -919,12 +955,13 @@ async def handle_send_to_run_message(ws_state: Dict, data: Dict):
                 partner_context = run_context['sub_context_refs']['_partner_context_ref']
                 partner_state = partner_context['state']
                 team_state = run_context['team_state']
+                payload = await prepare_payload(prompt_content)
 
                 # --- Core modification: Similarly, only create an InboxItem ---
                 inbox_item = {
                     "item_id": f"inbox_{uuid.uuid4().hex[:8]}",
                     "source": "USER_PROMPT",
-                    "payload": {"prompt": prompt_content},
+                    "payload": payload,
                     "consumption_policy": "consume_on_read",
                     "metadata": {"created_at": datetime.now(timezone.utc).isoformat()}
                 }

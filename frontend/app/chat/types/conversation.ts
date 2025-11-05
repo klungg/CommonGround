@@ -11,6 +11,16 @@ export interface Turn {
   end_time?: string | null;
   inputs?: {
     prompt?: string;
+    attachments?: Array<{
+      relative_path: string;
+      is_directory?: boolean;
+      size_bytes?: number;
+      mime_type?: string | null;
+    }>;
+    aggregated_text?: string;
+    absolute_files?: string[];
+    attachment_errors?: string[];
+    attachment_warnings?: string[];
   } | null;
   llm_interaction?: {
     status?: 'running' | 'completed' | 'error';
