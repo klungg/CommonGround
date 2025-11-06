@@ -29,6 +29,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "d3-flextree": "^2.1.2",
+    "global-agent": "^3.0.0",
     "lucide-react": "^0.468.0",
     "mobx": "^6.13.5",
     "mobx-react-lite": "^4.1.0",

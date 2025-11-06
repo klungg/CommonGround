@@ -1,0 +1,13 @@
+services:
+  bridge:
+    volumes:
+      - ../http-toolkit-ca-certificate.crt:/etc/ssl/certs/http-toolkit-ca.crt:ro
+    environment:
+      HTTP_PROXY: ${BRIDGE_HTTP_PROXY}
+      HTTPS_PROXY: ${BRIDGE_HTTPS_PROXY}
+      NO_PROXY: ${BRIDGE_NO_PROXY}
+      GLOBAL_AGENT_HTTP_PROXY: ${BRIDGE_GLOBAL_AGENT_HTTP_PROXY}
+      GLOBAL_AGENT_HTTPS_PROXY: ${BRIDGE_GLOBAL_AGENT_HTTPS_PROXY}
+      GLOBAL_AGENT_NO_PROXY: ${BRIDGE_GLOBAL_AGENT_NO_PROXY}
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/http-toolkit-ca.crt
+      NODE_OPTIONS: --require ./proxy-bootstrap.cjs
