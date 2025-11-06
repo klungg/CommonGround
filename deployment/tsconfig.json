@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
+    "declaration": true,
+    "allowSyntheticDefaultImports": true,
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "exclude": [
+    "**/node_modules",
+    "**/dist"
+  ]
+}
