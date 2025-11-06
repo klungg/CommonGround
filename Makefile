@@ -11,6 +11,7 @@
 #   - HTTP Toolkit installed
 #   - docker compose (v2) available, Docker daemon running
 #   - macOS users: Terminal automation permissions for `osascript` (used by `make start`)
+#   - HTTP Toolkit certificate file in root directory
 
 # ------------------------------------------------------------
 # Initialize the project
@@ -22,7 +23,7 @@
 PROXY ?= 0
 PROXY_URL ?=
 PROXY_CA_CERT ?= $(CURDIR)/http-toolkit-ca-certificate.crt
-PROXY_NO_PROXY ?= localhost,127.0.0.1,::1,bridge,host.docker.internal,core,frontend
+PROXY_NO_PROXY ?= localhost,127.0.0.1,::1,bridge,core,frontend
 
 comma := ,
 space :=
@@ -115,7 +116,7 @@ api: bridge
 	@echo "Launching API server in a new Terminal window with debug logging..."
 	@osascript -e 'tell application "Terminal"' \
 		-e 'activate' \
-        -e 'do script "cd \"$(CURDIR)/core\" && if [ \"$(PROXY)\" = \"1\" ]; then export HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) NO_PROXY=$(PROXY_NO_PROXY) REQUESTS_CA_BUNDLE=$(PROXY_CA_CERT) NODE_EXTRA_CA_CERTS=$(PROXY_CA_CERT); fi; if [ ! -d .venv ]; then uv venv; fi; uv sync && uv run run_server.py --reload --log-level DEBUG"' \
+        -e 'do script "cd \"$(CURDIR)/core\" && if [ \"$(PROXY)\" = \"1\" ]; then export HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) NO_PROXY=$(PROXY_NO_PROXY) REQUESTS_CA_BUNDLE=$(PROXY_CA_CERT) NODE_EXTRA_CA_CERTS=$(PROXY_CA_CERT) GEMINI_BRIDGE_URL=http://host.docker.internal:8765/v1; fi; if [ ! -d .venv ]; then uv venv; fi; uv sync && uv run run_server.py --reload --log-level DEBUG"' \
 		-e 'end tell'
 
 frontend: bridge
@@ -135,12 +136,12 @@ api-run:
 		uv venv; \
 	fi; \
 	if [ "$(PROXY)" = "1" ]; then \
-		HTTPS_PROXY="$(PROXY_URL)" HTTP_PROXY="$(PROXY_URL)" NO_PROXY="$(PROXY_NO_PROXY)" REQUESTS_CA_BUNDLE="$(PROXY_CA_CERT)" NODE_EXTRA_CA_CERTS="$(PROXY_CA_CERT)" uv sync; \
+		HTTPS_PROXY="$(PROXY_URL)" HTTP_PROXY="$(PROXY_URL)" NO_PROXY="$(PROXY_NO_PROXY)" REQUESTS_CA_BUNDLE="$(PROXY_CA_CERT)" NODE_EXTRA_CA_CERTS="$(PROXY_CA_CERT)" GEMINI_BRIDGE_URL="http://host.docker.internal:8765/v1" uv sync; \
 	else \
 		uv sync; \
 	fi; \
 	if [ "$(PROXY)" = "1" ]; then \
-		HTTPS_PROXY="$(PROXY_URL)" HTTP_PROXY="$(PROXY_URL)" NO_PROXY="$(PROXY_NO_PROXY)" REQUESTS_CA_BUNDLE="$(PROXY_CA_CERT)" NODE_EXTRA_CA_CERTS="$(PROXY_CA_CERT)" uv run run_server.py --reload --log-level DEBUG; \
+		HTTPS_PROXY="$(PROXY_URL)" HTTP_PROXY="$(PROXY_URL)" NO_PROXY="$(PROXY_NO_PROXY)" REQUESTS_CA_BUNDLE="$(PROXY_CA_CERT)" NODE_EXTRA_CA_CERTS="$(PROXY_CA_CERT)" GEMINI_BRIDGE_URL="http://host.docker.internal:8765/v1" uv run run_server.py --reload --log-level DEBUG; \
 	else \
 		uv run run_server.py --reload --log-level DEBUG; \
 	fi
@@ -176,10 +177,10 @@ start:
 	echo "Starting bridge..."; \
 	$(MAKE) PROXY=$(PROXY) PROXY_URL="$(PROXY_URL)" PROXY_CA_CERT="$(PROXY_CA_CERT)" PROXY_NO_PROXY="$(PROXY_NO_PROXY)" bridge || exit $$?; \
 	echo "Bridge is healthy; launching API and frontend terminals with debug logging."; \
-	osascript -e 'tell application "Terminal"' \
-		-e 'activate' \
-		-e 'do script "cd \"$(CURDIR)/core\" && if [ \"$(PROXY)\" = \"1\" ]; then export HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) NO_PROXY=$(PROXY_NO_PROXY) REQUESTS_CA_BUNDLE=$(PROXY_CA_CERT) NODE_EXTRA_CA_CERTS=$(PROXY_CA_CERT); fi; if [ ! -d .venv ]; then uv venv; fi; uv sync && uv run run_server.py --reload --log-level DEBUG"' \
-		-e 'end tell'; \
+		osascript -e 'tell application "Terminal"' \
+			-e 'activate' \
+			-e 'do script "cd \"$(CURDIR)/core\" && if [ \"$(PROXY)\" = \"1\" ]; then export HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) NO_PROXY=$(PROXY_NO_PROXY) REQUESTS_CA_BUNDLE=$(PROXY_CA_CERT) NODE_EXTRA_CA_CERTS=$(PROXY_CA_CERT) GEMINI_BRIDGE_URL=http://host.docker.internal:8765/v1; fi; if [ ! -d .venv ]; then uv venv; fi; uv sync && uv run run_server.py --reload --log-level DEBUG"' \
+			-e 'end tell'; \
 	sleep 2; \
 	osascript -e 'tell application "Terminal"' \
 		-e 'activate' \
