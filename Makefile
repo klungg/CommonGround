@@ -1,16 +1,20 @@
 # Quick start:
 #   make start            # launch bridge, API, frontend (no proxy)
 #   make start proxy      # launch stack with HTTP Toolkit proxy (defaults to http://localhost:8001)
+#   make rebuild          # rebuild the bridge image (runs without proxy)
+
 #   PROXY_URL=http://host:port make start proxy  # custom proxy endpoint
 # Proxy mode rewrites the container proxy host to host.docker.internal automatically; host shells keep the original value.
-# If you need to rebuild the bridge image, run `docker compose -f deployment/docker-compose.yaml build bridge`
-# (outside proxy mode) before `make start`.
+# To rebuild the bridge image explicitly, run `make rebuild` (runs without proxy).
 
 # Prerequisites:
 #   - HTTP Toolkit installed
 #   - docker compose (v2) available, Docker daemon running
 #   - macOS users: Terminal automation permissions for `osascript` (used by `make start`)
 
+# ------------------------------------------------------------
+# Initialize the project
+# ------------------------------------------------------------
 .PHONY: bridge api frontend dev start api-run frontend-run proxy
 
 # Proxy configuration
@@ -184,3 +188,12 @@ start:
 
 proxy:
 	@true
+
+# ------------------------------------------------------------
+# Rebuild the bridge image
+# ------------------------------------------------------------
+.PHONY: rebuild
+
+rebuild:
+	cd deployment && \
+	docker compose -f docker-compose.yaml build bridge
