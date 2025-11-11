@@ -69,6 +69,25 @@ class InboxProcessor:
             "metadata": {"client_source": "websocket"},
             "error_details": None,
         }
+
+        payload = item.get("payload") if isinstance(item, dict) else None
+        if isinstance(payload, dict):
+            attachments = payload.get("attachments")
+            if attachments:
+                user_turn["inputs"]["attachments"] = attachments
+            attachment_warnings = payload.get("attachment_warnings")
+            if attachment_warnings:
+                user_turn["inputs"]["attachment_warnings"] = attachment_warnings
+            attachment_errors = payload.get("attachment_errors")
+            if attachment_errors:
+                user_turn["inputs"]["attachment_errors"] = attachment_errors
+            aggregated_text = payload.get("aggregated_text")
+            if aggregated_text:
+                user_turn["inputs"]["aggregated_text"] = aggregated_text
+            absolute_files = payload.get("absolute_files")
+            if absolute_files:
+                user_turn["inputs"]["absolute_files"] = absolute_files
+
         team_state.setdefault("turns", []).append(user_turn)
         logger.debug("user_turn_created", extra={"agent_id": self.agent_id, "user_turn_id": user_turn_id})
         
@@ -258,6 +277,42 @@ class InboxProcessor:
                         "_no_handover": True,
                         "_source_event": "AGENT_STARTUP_BRIEFING"
                     }
+
+                parts_payload = payload.get("parts") if isinstance(payload, dict) else None
+                text_segments_payload = payload.get("text_segments") if isinstance(payload, dict) else None
+                token_text = injected_content if isinstance(injected_content, str) else ""
+
+                if isinstance(text_segments_payload, list) and text_segments_payload:
+                    combined_parts: List[Any] = []
+                    base_text = injected_content if isinstance(injected_content, str) else ""
+                    if base_text:
+                        combined_parts.append({"type": "text", "text": base_text})
+                    token_text = base_text
+
+                    for segment in text_segments_payload:
+                        if not isinstance(segment, dict):
+                            continue
+                        segment_text = str(segment.get("text", ""))
+                        if not segment_text:
+                            continue
+                        combined_parts.append({"type": "text", "text": segment_text})
+                        token_text += segment_text
+
+                    new_message["content"] = combined_parts
+                else:
+                    new_message["content"] = injected_content
+
+                if isinstance(parts_payload, list) and parts_payload:
+                    if isinstance(new_message.get("content"), list):
+                        combined_parts = list(new_message["content"])
+                    else:
+                        base_text = new_message.get("content")
+                        combined_parts = []
+                        if isinstance(base_text, str) and base_text:
+                            combined_parts.append({"type": "text", "text": base_text})
+                            token_text = token_text or base_text
+                    combined_parts.extend(parts_payload)
+                    new_message["content"] = combined_parts
                 
                 if role == "tool":
                     new_message["tool_call_id"] = dehydrated_payload.get("tool_call_id")
@@ -282,7 +337,24 @@ class InboxProcessor:
                     found = False
                     for msg in messages_for_llm:
                         if msg.get("role") == role:
-                            msg["content"] = f"{injected_content}\n\n---\n\n{msg['content']}"
+                            existing_content = msg.get("content")
+                            if isinstance(existing_content, list):
+                                new_parts = new_message.get("content")
+                                if isinstance(new_parts, list):
+                                    for part in reversed(new_parts):
+                                        existing_content.insert(0, part)
+                                else:
+                                    existing_content.insert(0, {"type": "text", "text": injected_content})
+                            else:
+                                if isinstance(new_message.get("content"), list):
+                                    combined_text = "".join(
+                                        part.get("text", "")
+                                        for part in new_message["content"]
+                                        if isinstance(part, dict) and part.get("type") == "text"
+                                    )
+                                    msg["content"] = f"{combined_text}\n\n---\n\n{existing_content}"
+                                else:
+                                    msg["content"] = f"{injected_content}\n\n---\n\n{existing_content}"
                             found = True
                             break
                     if not found:
@@ -297,11 +369,11 @@ class InboxProcessor:
                     self.state.setdefault("messages", []).append(new_message)
 
                 predicted_tokens = 0
-                if injected_content:
+                if token_text:
                     resolver = LLMConfigResolver(shared_llm_configs=self.run_context.get("config", {}).get("shared_llm_configs_ref", {}))
                     llm_config = resolver.resolve(self.profile)
                     model_name = llm_config.get("model")
-                    predicted_tokens = estimate_prompt_tokens(model=model_name, text=injected_content, llm_config_for_tokenizer=llm_config)
+                    predicted_tokens = estimate_prompt_tokens(model=model_name, text=token_text, llm_config_for_tokenizer=llm_config)
 
                 # 4. Log processing
                 processing_log.append({

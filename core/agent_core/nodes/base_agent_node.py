@@ -923,7 +923,6 @@ class AgentNode(AsyncNode):
         cleaned_messages = []
         
         for msg in messages:
-            # Create a clean copy of the message
             cleaned_msg = {}
             
             # Keep only the standard fields required by the LLM
@@ -938,6 +937,8 @@ class AgentNode(AsyncNode):
                             import json
                             cleaned_msg[key] = json.dumps(value, ensure_ascii=False)
                             logger.debug("dict_content_converted_to_json", extra={"message_role": msg.get('role')})
+                        elif isinstance(value, list):
+                            cleaned_msg[key] = value
                         elif value is None:
                             cleaned_msg[key] = ""  # Prevent None content
                         else:
